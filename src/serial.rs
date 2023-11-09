@@ -33,7 +33,7 @@ use crate::dma::Buffer;
 ))]
 use crate::gpio::gpioc::*;
 use crate::gpio::{gpioa::*, gpiob::*};
-#[cfg(any(feature = "io-STM32L071"))]
+#[cfg(feature = "io-STM32L071")]
 use crate::gpio::{gpiod::*, gpioe::*};
 
 /// Serial error
