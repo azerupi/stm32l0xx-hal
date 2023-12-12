@@ -95,6 +95,7 @@ pub struct Config {
     pub wordlength: WordLength,
     pub parity: Parity,
     pub stopbits: StopBits,
+    pub half_duplex: bool,
 }
 
 impl Config {
@@ -132,6 +133,11 @@ impl Config {
         self.stopbits = stopbits;
         self
     }
+
+    pub fn half_duplex(mut self, half_duplex: bool) -> Self {
+        self.half_duplex = half_duplex;
+        self
+    }
 }
 
 #[derive(Debug)]
@@ -145,6 +151,7 @@ impl Default for Config {
             wordlength: WordLength::DataBits8,
             parity: Parity::ParityNone,
             stopbits: StopBits::STOP1,
+            half_duplex: false,
         }
     }
 }
@@ -388,6 +395,28 @@ macro_rules! usart {
                             StopBits::STOP1P5 => 0b11,
                         })
                     );
+
+                    // Enable half-duplex mode
+                    //
+                    // Clear LINEN in CR2
+                    // Clear CLKEN in CR2
+                    // Clear SCEN in CR3
+                    // Clear IREN in CR3
+                    // Set HDSEL in CR3
+                    if config.half_duplex {
+                        usart.cr2.modify(|_, w|
+                            w
+                            .linen().clear_bit()
+                            .clken().clear_bit()
+                        );
+                        usart.cr3.modify(|_, w|
+                            w
+                            .scen().clear_bit()
+                            .iren().clear_bit()
+                            .hdsel().set_bit()
+                        );
+                    }
+
                     Ok(Serial {
                         usart,
                         tx: Tx { _usart: PhantomData },
@@ -555,6 +584,22 @@ macro_rules! usart {
                         .ncf().set_bit()
                         .orecf().set_bit()
                     );
+                }
+
+                pub fn baud_rate(&mut self, rcc: &mut Rcc, baud_rate: Baud) {
+                    let brr = unsafe { &(*$USARTX::ptr()).brr };
+
+                    // Calculate correct baudrate divisor on the fly
+                    let div = (rcc.clocks.$pclkX().0 * 25) / (4 * baud_rate.0);
+                    let mantissa = div / 100;
+                    let fraction = ((div - mantissa * 100) * 16 + 50) / 100;
+                    let mut brr_value = mantissa << 4 | fraction;
+
+                    if stringify!($usartX) == "lpuart1" {
+                        brr_value *= 256
+                    }
+
+                    brr.write(|w| unsafe { w.bits(brr_value) });
                 }
             }
 
@@ -743,7 +788,7 @@ macro_rules! usart {
     feature = "io-STM32L071",
 ))]
 usart! {
-    LPUART1: (lpuart1, apb1_clk, Serial1LpExt),
+    //LPUART1: (lpuart1, apb1_clk, Serial1LpExt),
     USART2: (usart2, apb1_clk, Serial2Ext),
 }
 
