@@ -96,6 +96,7 @@ pub struct Config {
     pub wordlength: WordLength,
     pub parity: Parity,
     pub stopbits: StopBits,
+    pub half_duplex: bool,
 }
 
 impl Config {
@@ -133,6 +134,11 @@ impl Config {
         self.stopbits = stopbits;
         self
     }
+
+    pub fn half_duplex(mut self, half_duplex: bool) -> Self {
+        self.half_duplex = half_duplex;
+        self
+    }
 }
 
 #[derive(Debug)]
@@ -146,6 +152,7 @@ impl Default for Config {
             wordlength: WordLength::DataBits8,
             parity: Parity::ParityNone,
             stopbits: StopBits::STOP1,
+            half_duplex: false,
         }
     }
 }
@@ -389,6 +396,10 @@ macro_rules! usart {
                             StopBits::STOP1P5 => 0b11,
                         })
                     );
+
+                    // Configure half-duplex
+                    usart.cr3.modify(|_, w| w.hdsel().bit(config.half_duplex));
+
                     Ok(Serial {
                         usart,
                         tx: Tx { _usart: PhantomData },
